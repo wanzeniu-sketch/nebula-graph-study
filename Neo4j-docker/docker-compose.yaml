@@ -1,0 +1,19 @@
+version: '3'
+services:
+  neo4j:
+    image: neo4j:5.15.0-community  # 社区版足够学习用
+    container_name: neo4j-m4
+    ports:
+      - "7474:7474"  # HTTP端口，用于 Web 界面 (超级好用！)
+      - "7687:7687"  # Bolt端口，用于 Java 代码连接
+    environment:
+      - NEO4J_AUTH=neo4j/12345678  # 设置账号/密码
+      - NEO4J_PLUGINS=["graph-data-science"]
+    volumes:
+      # 为了稳妥，我们继续使用具名卷，避免 M4 的 IO 权限问题
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
