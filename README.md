@@ -1,94 +1,103 @@
 # 🚀 Graph Database Deep Dive: NebulaGraph vs. Neo4j
 
-> **Project Author**: [你的名字/GitHub ID]
-> **Environment**: macOS M4 | Docker | Java 21 | VS Code
+> **Project Author**: [Your Name/GitHub ID]
+> **Environment**: macOS M4 (Apple Silicon) | Docker | Java 21
 
-## 📖 项目背景
-本项目记录了对主流图数据库 **NebulaGraph** (分布式) 和 **Neo4j** (原生单机) 的深度对比研究。
-通过 Docker 容器化部署、Java 客户端开发、以及高并发/事务场景的模拟测试，深入探索了两种架构在**数据一致性**、**事务机制**及**图算法**应用上的本质区别。
+## 📖 项目背景 (Project Background)
+
+本项目是一个深度对比研究项目，旨在探索主流图数据库 **NebulaGraph** (分布式架构) 和 **Neo4j** (原生单机架构) 在核心机制上的本质区别。
+
+通过 Docker 容器化部署和 Java 客户端实战，本项目深入验证了两者在**数据一致性 (CAP)**、**事务机制 (ACID)**、**高并发控制**以及**图算法 (GDS)** 方面的不同表现与最佳实践。
 
 ---
 
 ## 🛠 技术栈 (Tech Stack)
 
-* **Infrastructure**: Docker, Docker Compose
+* **Infrastructure**: Docker Desktop (Proxy Configured), Docker Compose
 * **Databases**:
     * **NebulaGraph**: v3.6.0 (Distributed, Strong Partitioning)
-    * **Neo4j**: v5.15.0 Community (Native Graph, ACID)
+    * **Neo4j**: v5.15.0 Community (Native Graph, ACID Supported)
 * **Languages**: Java 21 (Preview features enabled)
 * **Tools**: Maven, Neo4j Browser, Nebula Console
-* **Algorithms**: Neo4j GDS (Graph Data Science) - PageRank
+* **Algorithms**: Neo4j GDS (PageRank)
 
 ---
 
-## ⚖️ 核心架构对比 (Architectural Insights)
+## ⚖️ 核心架构对比 (Architecture Comparison)
 
-这是本项目得出的最重要的架构选型结论：
-
-| 特性 | NebulaGraph 🌌 | Neo4j 🟢 |
+| 特性 Feature | NebulaGraph 🌌 | Neo4j 🟢 |
 | :--- | :--- | :--- |
 | **架构设计** | **分布式存储计算分离** (Shared-nothing) | **Native Graph** (单机/主从) |
 | **适用场景** | 海量数据 (千亿点边)、高吞吐并发、风控/推荐 | 金融核心交易、复杂路径分析、中小型图谱 |
-| **事务支持** | **不支持完整 ACID** (最终一致性) | **完全支持 ACID** (强一致性) |
+| **事务支持** | **无完整 ACID** (最终一致性) | **完全支持 ACID** (强一致性) |
 | **并发控制** | **Last Write Wins** (需应用层实现乐观锁) | **悲观锁** (自动排队，串行化修改) |
 | **查询语言** | **nGQL** (类 SQL) | **Cypher** (模式匹配，所见即所得) |
 | **可视化** | 需单独部署 Studio / Console | 内置 Browser (非常强大，支持样式定制) |
 
 ---
 
-## 🧩 模块一：Neo4j 实战 (The ACID Power)
+## 📂 模块一：Neo4j 实战 (The ACID Power)
 
-### 1. 部署与配置
-* 针对 **Apple Silicon (M4)** 芯片进行了 Docker 内存与 IO 优化。
-* 解决了 Docker 镜像拉取时的 TLS Handshake 网络问题（配置 Docker Proxy）。
-* 集成 **GDS (Graph Data Science)** 插件，用于运行图算法。
+> 位于目录: `./Neo4j-docker`
 
-### 2. 核心功能实现
+### 1. 核心功能实现
 * **连接池管理**: 封装 `Neo4jUtils`，实现 Driver 单例模式与资源自动释放。
-* **ACID 事务模拟**: 在 `Neo4jTransactionTest` 中模拟银行转账场景。
-    * ✅ **测试结果**: 在扣款成功后手动抛出异常，数据库自动回滚 (Rollback)，验证了数据的原子性。
-* **图算法 (PageRank)**:
-    * 构建“职场信任关系网”。
-    * 运行 PageRank 算法计算节点权重，识别出“被 CEO 信任的实习生”拥有比经理更高的影响力。
-    * 将计算结果写回图属性，并通过 Neo4j Browser 进行**数据驱动的大小可视化 (Data-driven Styling)**。
+* **ACID 事务模拟**: 在 `Neo4jTransactionTest.java` 中模拟银行转账场景。
+    * ✅ **测试结果**: 验证了在扣款成功后手动抛出异常，Neo4j 能够自动 **回滚 (Rollback)**，保证资金不丢失。
+* **参数化查询**: 使用 `Values.parameters()` 防止 Cypher 注入，提升执行效率。
 
-### 3. 代码结构
-```text
-src/main/java/com/example/
-├── Neo4jUtils.java           // 连接池与通用 CRUD 封装
-├── Neo4jCRUDTest.java        // 增删改查全流程测试 (防注入参数化查询)
-└── Neo4jTransactionTest.java // 转账异常回滚测试 (ACID 验证)
+### 2. 图算法实战 (Graph Data Science)
+* **环境配置**: 解决了 Docker 镜像拉取失败问题，成功集成 GDS 插件。
+* **算法应用**:
+    * 构建了复杂的“职场信任关系网”。
+    * 运行 **PageRank** 算法计算节点权重，发现“被 CEO 信任的实习生”拥有比“经理”更高的影响力。
+    * **可视化**: 将算法评分写回图属性，通过 Neo4j Browser 实现了数据驱动的节点大小动态展示。
 
-模块二：NebulaGraph 实战 (The Distributed Speed)
+---
 
-1. 核心挑战
-ABA 问题防御: 在分布式无锁架构下，实现了基于 CAS (Compare-And-Swap) 和 version 版本号的应用层乐观锁。
+## 🌌 模块二：NebulaGraph 实战 (The Distributed Speed)
 
-Schema 管理: 解决了容器内缺失 Console 工具的问题，通过 Java 代码直接维护图空间与 Schema。
+> 位于目录: `./nebula-docker`
 
-2. 关键代码逻辑 (Java)
-Java
+### 1. 核心挑战与解决方案
+* **分布式无锁架构**: 针对 Nebula 不支持事务的特性，在应用层实现了 **乐观锁 (Optimistic Locking)** 机制。
+* **ABA 问题防御**:
+    * 场景：高并发下同一数据被多次修改。
+    * 方案：引入 `ver` (版本号) 字段，使用 CAS (Compare-And-Swap) 语法：
+      ```sql
+      UPDATE VERTEX ON player SET age = 30, ver = ver + 1 
+      WHERE id == "101" AND ver == $old_ver;
+      ```
+* **Schema 管理**: 解决了容器内缺失 Console 工具的问题，通过 Java 代码直接维护图空间 (Space) 与 Tag/EdgeType。
 
-// 乐观锁核心逻辑：防止更新丢失
-String cypher = "MATCH (n) WHERE n.id = $id AND n.ver = $oldVer " +
-                "SET n.prop = $newVal, n.ver = n.ver + 1";
-// 如果影响行数为 0，说明数据已被他人修改，抛出异常提示重试。
+---
 
-快速开始 (How to Run)
-1. 启动 Neo4j 容器
-Bash
+## 🚀 快速开始 (How to Run)
 
+### 前置要求
+* Docker & Docker Compose
+* Java JDK 21+
+* Maven
+
+### 1. 运行 Neo4j 演示
+```bash
 cd Neo4j-docker
+# 启动容器 (包含 GDS 插件)
 docker-compose up -d
-2. 运行测试代码
-确保已安装 Maven：
 
+# 运行事务测试代码
+mvn clean compile
+mvn exec:java -Dexec.mainClass="com.example.Neo4jTransactionTest"
+
+访问可视化界面: http://localhost:7474 (User: neo4j / Pass: 12345678)
+
+运行 NebulaGraph 演示
 Bash
 
-# 运行 CRUD 测试
-mvn exec:java -Dexec.mainClass="com.example.Neo4jCRUDTest"
+cd nebula-docker
+# 启动分布式集群 (Meta + Storage + Graphd)
+docker-compose up -d
 
-# 运行事务回滚测试
-mvn exec:java -Dexec.mainClass="com.example.Neo4jTransactionTest"
-3. 查看可视化
-访问浏览器 http://localhost:7474 (User: neo4j / Pass: 12345678)。
+# 运行并发测试代码
+mvn clean compile
+mvn exec:java -Dexec.mainClass="com.example.NebulaABATest"

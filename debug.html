@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neo4j 连接诊断工具</title>
+    <script src="https://unpkg.com/neo4j-driver@5.12.0/lib/browser/neo4j-web.min.js"></script>
+    <style>
+        body { background: #222; color: #fff; font-family: monospace; padding: 20px; }
+        #log { white-space: pre-wrap; }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>🕵️ Neo4j 连接诊断模式</h2>
+    <p>当前配置: URL=bolt://localhost:7687 | User=neo4j | Pass=12345678</p>
+    <button onclick="testConnection()">开始测试连接</button>
+    <hr>
+    <div id="log">等待测试...</div>
+
+    <script>
+        // 辅助日志函数
+        function log(msg, type = '') {
+            const el = document.getElementById('log');
+            const span = document.createElement('div');
+            span.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            if (type) span.className = type;
+            el.appendChild(span);
+            console.log(msg);
+        }
+
+        async function testConnection() {
+            document.getElementById('log').innerHTML = ''; // 清空日志
+            log("正在初始化驱动...");
+
+            const uri = 'bolt://localhost:7687';
+            const user = 'neo4j';
+            const password = '12345678'; // 你的密码
+
+            try {
+                // 1. 尝试建立驱动实例 (注意这里的 encrypted 配置)
+                const driver = neo4j.driver(
+                    uri,
+                    neo4j.auth.basic(user, password),
+                    { 
+                        // 显式关闭加密，这是本地连接最关键的配置
+                        encrypted: false, 
+                        // 设置信任策略（虽然关闭加密后这个通常被忽略，但加上保险）
+                        trust: "TRUST_ALL_CERTIFICATES"
+                    }
+                );
+
+                log("驱动初始化完成，正在尝试验证连接...", "info");
+
+                // 2. 尝试获取由服务器验证的会话
+                await driver.verifyConnectivity();
+                log("✅ 连接验证成功！服务器可达且密码正确。", "success");
+
+                // 3. 尝试运行一个简单查询
+                const session = driver.session();
+                log("正在运行测试查询: RETURN 1...");
+                const result = await session.run('RETURN 1 AS num');
+                
+                const value = result.records[0].get('num').toInt();
+                log(`✅ 查询成功！数据库返回结果: ${value}`, "success");
+                
+                await session.close();
+                await driver.close();
+                
+                log("测试结束。结论：你的浏览器环境完全可以连接数据库。", "success");
+                log("👉 如果这里成功了，说明是 Neovis 的配置写法问题。", "info");
+
+            } catch (error) {
+                log(`❌ 连接失败: ${error.message}`, "error");
+                log(`错误详情: ${error.code}`, "error");
+                
+                if (error.message.includes("Unauthorized")) {
+                    log("分析：服务器拒绝了密码。虽然你说密码是对的，但驱动层面的握手被拒绝了。", "error");
+                } else if (error.message.includes("WebSocket")) {
+                    log("分析：WebSocket 网络连接断开。这通常是因为浏览器阻止了非加密连接。", "error");
+                }
+            }
+        }
+    </script>
+</body>
+</html>
